@@ -95,7 +95,7 @@ describe("MCP-compliant diff operations", function()
 
       -- Set up mock resolution
       _G.claude_deferred_responses = {
-        [tostring(coroutine.running())] = function()
+        [vim.inspect(coroutine.running())] = function()
           -- Mock resolution
         end,
       }
