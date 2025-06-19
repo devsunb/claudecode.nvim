@@ -769,6 +769,18 @@ local vim = {
     warn = function(...) end,
     error = function(...) end,
   },
+
+  env = setmetatable({}, {
+    __index = function(_, key)
+      return vim._env and vim._env[key] or nil
+    end,
+    __newindex = function(_, key, value)
+      if not vim._env then
+        vim._env = {}
+      end
+      vim._env[key] = value
+    end,
+  }),
 }
 
 -- Helper function to split lines
@@ -809,6 +821,7 @@ vim._mock = {
     vim._autocmds = {}
     vim._vars = {}
     vim._options = {}
+    vim._env = {}
     vim._last_command = nil
     vim._last_echo = nil
     vim._last_error = nil

@@ -322,9 +322,11 @@ For most users, the default configuration is sufficient:
     terminal = {
       split_side = "right",                     -- "left" or "right"
       split_width_percentage = 0.30,            -- Width as percentage (0.0 to 1.0)
-      provider = "auto",                        -- "auto", "snacks", or "native"
+      provider = "auto",                        -- "auto", "tmux", "snacks", or "native"
       show_native_term_exit_tip = true,         -- Show exit tip for native terminal
       auto_close = true,                        -- Auto-close terminal after command completion
+      tmux_pane_size = "30%",                   -- Size for tmux pane (when using tmux provider)
+      tmux_split_direction = "h",               -- "h" for horizontal, "v" for vertical (when using tmux provider)
     },
 
     -- Diff Integration
@@ -365,11 +367,14 @@ For most users, the default configuration is sufficient:
 - **`split_side`**: Which side to open the terminal split (`"left"` or `"right"`)
 - **`split_width_percentage`**: Terminal width as a fraction of screen width (0.1 = 10%, 0.5 = 50%)
 - **`provider`**: Terminal implementation to use:
-  - `"auto"`: Try snacks.nvim, fallback to native
+  - `"auto"`: Try tmux first (if available), then snacks.nvim, fallback to native
+  - `"tmux"`: Use tmux split-window (requires running inside tmux)
   - `"snacks"`: Force snacks.nvim (requires folke/snacks.nvim)
   - `"native"`: Use built-in Neovim terminal
 - **`show_native_term_exit_tip`**: Show help text for exiting native terminal
 - **`auto_close`**: Automatically close terminal when commands finish
+- **`tmux_pane_size`**: Size for tmux pane as percentage string (e.g., "30%") when using tmux provider
+- **`tmux_split_direction`**: Split direction for tmux pane ("h" for horizontal, "v" for vertical)
 
 #### Diff Options
 
