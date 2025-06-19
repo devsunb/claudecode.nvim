@@ -141,7 +141,7 @@ describe("openDiff tool MCP compliance", function()
 
       -- Start the coroutine
       local success, err = coroutine.resume(co)
-      assert.is_true(success, "Tool should start successfully: " .. tostring(err))
+      assert.is_true(success, "Tool should start successfully: " .. vim.inspect(err))
       assert.equal("suspended", coroutine.status(co), "Should be suspended waiting for user action")
 
       -- Simulate file save
@@ -178,7 +178,7 @@ describe("openDiff tool MCP compliance", function()
 
       -- Start the coroutine
       local success, err = coroutine.resume(co)
-      assert.is_true(success, "Tool should start successfully: " .. tostring(err))
+      assert.is_true(success, "Tool should start successfully: " .. vim.inspect(err))
       assert.equal("suspended", coroutine.status(co), "Should be suspended waiting for user action")
 
       -- Simulate diff rejection
@@ -212,7 +212,7 @@ describe("openDiff tool MCP compliance", function()
 
       -- Set up mock resolution to avoid hanging
       _G.claude_deferred_responses = {
-        [tostring(coroutine.running())] = function(result)
+        [vim.inspect(coroutine.running())] = function(result)
           -- Mock resolution
         end,
       }
