@@ -66,27 +66,13 @@ local function handler(params)
     error({ code = -32000, message = "Internal server error", data = "Failed to load diff module" })
   end
 
-  -- Use the new blocking diff operation
-  local success, result = pcall(
-    diff_module.open_diff_blocking,
+  -- Call the blocking diff operation directly (no pcall to allow yielding)
+  local result = diff_module.open_diff_blocking(
     params.old_file_path,
     params.new_file_path,
     params.new_file_contents,
     params.tab_name
   )
-
-  if not success then
-    -- Check if this is already a structured error
-    if type(result) == "table" and result.code then
-      error(result)
-    else
-      error({
-        code = -32000, -- Generic tool error
-        message = "Error opening blocking diff",
-        data = tostring(result),
-      })
-    end
-  end
 
   -- result should already be MCP-compliant with content array format
   return result
