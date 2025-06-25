@@ -1,4 +1,4 @@
-describe("claudecode.terminal (wrapper for Snacks.nvim)", function()
+describe("claudecode.terminal", function()
   local terminal_wrapper
   local spy
   local mock_snacks_module
@@ -6,6 +6,7 @@ describe("claudecode.terminal (wrapper for Snacks.nvim)", function()
   local mock_claudecode_config_module
   local mock_snacks_provider
   local mock_native_provider
+  local mock_tmux_provider
   local last_created_mock_term_instance
   local create_mock_terminal_instance
 
@@ -225,6 +226,7 @@ describe("claudecode.terminal (wrapper for Snacks.nvim)", function()
     package.loaded["claudecode.terminal"] = nil
     package.loaded["claudecode.terminal.snacks"] = nil
     package.loaded["claudecode.terminal.native"] = nil
+    package.loaded["claudecode.terminal.tmux"] = nil
     package.loaded["claudecode.server.init"] = nil
     package.loaded["snacks"] = nil
     package.loaded["claudecode.config"] = nil
@@ -287,6 +289,22 @@ describe("claudecode.terminal (wrapper for Snacks.nvim)", function()
       end),
     }
     package.loaded["claudecode.terminal.native"] = mock_native_provider
+
+    mock_tmux_provider = {
+      setup = spy.new(function() end),
+      open = spy.new(function() end),
+      close = spy.new(function() end),
+      toggle = spy.new(function() end),
+      simple_toggle = spy.new(function() end),
+      focus_toggle = spy.new(function() end),
+      get_active_bufnr = spy.new(function()
+        return nil
+      end),
+      is_available = spy.new(function()
+        return false -- Default to false, tests can override
+      end),
+    }
+    package.loaded["claudecode.terminal.tmux"] = mock_tmux_provider
 
     mock_snacks_terminal = {
       open = spy.new(create_mock_terminal_instance),
@@ -357,6 +375,7 @@ describe("claudecode.terminal (wrapper for Snacks.nvim)", function()
     package.loaded["claudecode.terminal"] = nil
     package.loaded["claudecode.terminal.snacks"] = nil
     package.loaded["claudecode.terminal.native"] = nil
+    package.loaded["claudecode.terminal.tmux"] = nil
     package.loaded["claudecode.server.init"] = nil
     package.loaded["snacks"] = nil
     package.loaded["claudecode.config"] = nil
@@ -417,6 +436,120 @@ describe("claudecode.terminal (wrapper for Snacks.nvim)", function()
         "claudecode.terminal.setup expects a table or nil for user_term_config",
         vim.log.levels.WARN
       )
+    end)
+
+    it("should accept tmux specific configurations", function()
+      -- Make tmux available for this test
+      mock_tmux_provider.is_available = spy.new(function()
+        return true
+      end)
+
+      -- Reload terminal module and reset notify
+      package.loaded["claudecode.terminal"] = nil
+      terminal_wrapper = require("claudecode.terminal")
+      vim.notify:clear()
+
+      terminal_wrapper.setup({
+        provider = "tmux",
+        tmux_pane_size = "40%",
+        tmux_split_direction = "v",
+      })
+      -- Setup successful, configuration stored
+      vim.notify:was_not_called()
+    end)
+
+    it("should ignore invalid tmux_split_direction and use default", function()
+      terminal_wrapper.setup({ tmux_split_direction = "invalid" })
+      vim.notify:was_called_with(
+        spy.matching.string.match("Invalid value for tmux_split_direction"),
+        vim.log.levels.WARN
+      )
+    end)
+  end)
+
+  describe("provider selection", function()
+    it("should prefer tmux when available in auto mode", function()
+      -- Make tmux available
+      mock_tmux_provider.is_available = spy.new(function()
+        return true
+      end)
+
+      -- Reload terminal module to pick up new mock
+      package.loaded["claudecode.terminal"] = nil
+      terminal_wrapper = require("claudecode.terminal")
+
+      terminal_wrapper.setup({ provider = "auto" })
+      terminal_wrapper.open()
+
+      -- Should check tmux availability
+      mock_tmux_provider.is_available:was_called()
+      mock_tmux_provider.open:was_called(1)
+      mock_snacks_provider.open:was_not_called()
+      mock_native_provider.open:was_not_called()
+    end)
+
+    it("should fallback to snacks when tmux is not available in auto mode", function()
+      -- Make tmux unavailable, snacks available
+      mock_tmux_provider.is_available = spy.new(function()
+        return false
+      end)
+      mock_snacks_provider.is_available = spy.new(function()
+        return true
+      end)
+
+      -- Reload terminal module to pick up new mocks
+      package.loaded["claudecode.terminal"] = nil
+      terminal_wrapper = require("claudecode.terminal")
+
+      terminal_wrapper.setup({ provider = "auto" })
+      terminal_wrapper.open()
+
+      -- Should check tmux first, then snacks
+      mock_tmux_provider.is_available:was_called()
+      mock_snacks_provider.is_available:was_called()
+      mock_snacks_provider.open:was_called(1)
+      mock_tmux_provider.open:was_not_called()
+      mock_native_provider.open:was_not_called()
+    end)
+
+    it("should use tmux provider when explicitly configured", function()
+      mock_tmux_provider.is_available = spy.new(function()
+        return true
+      end)
+
+      terminal_wrapper.setup({ provider = "tmux" })
+      terminal_wrapper.open()
+
+      mock_tmux_provider.open:was_called(1)
+      mock_snacks_provider.open:was_not_called()
+      mock_native_provider.open:was_not_called()
+    end)
+
+    it("should fallback to native when tmux is configured but not available", function()
+      mock_tmux_provider.is_available = spy.new(function()
+        return false
+      end)
+
+      terminal_wrapper.setup({ provider = "tmux" })
+      terminal_wrapper.open()
+
+      -- Check that vim.notify was called with the warning message
+      vim.notify:was_called()
+      local notify_calls = vim.notify.calls
+      local found = false
+      for _, call in ipairs(notify_calls) do
+        if
+          call.refs[1]
+          and call.refs[1]:match("'tmux' provider configured, but tmux not available")
+          and call.refs[2] == vim.log.levels.WARN
+        then
+          found = true
+          break
+        end
+      end
+      assert(found, "Expected vim.notify to be called with tmux unavailable warning")
+      mock_native_provider.open:was_called(1)
+      mock_tmux_provider.open:was_not_called()
     end)
   end)
 
@@ -617,6 +750,51 @@ describe("claudecode.terminal (wrapper for Snacks.nvim)", function()
       mock_snacks_provider.open:reset()
       terminal_wrapper.open()
       mock_snacks_provider.open:was_called(1)
+    end)
+  end)
+
+  describe("tmux provider integration", function()
+    before_each(function()
+      -- Set up tmux environment and make tmux available
+      vim.env.TMUX = "/tmp/tmux-1000/default,1234,0"
+      mock_tmux_provider.is_available = spy.new(function()
+        return true
+      end)
+    end)
+
+    it("should pass tmux configuration to tmux provider", function()
+      terminal_wrapper.setup({
+        provider = "tmux",
+        tmux_pane_size = "40%",
+        tmux_split_direction = "v",
+      })
+      terminal_wrapper.open()
+
+      mock_tmux_provider.open:was_called(1)
+      local config_arg = mock_tmux_provider.open:get_call(1).refs[3]
+      assert.are.equal("40%", config_arg.tmux_pane_size)
+      assert.are.equal("v", config_arg.tmux_split_direction)
+    end)
+
+    it("should use tmux provider methods for toggle operations", function()
+      terminal_wrapper.setup({ provider = "tmux" })
+
+      -- Test simple_toggle
+      terminal_wrapper.toggle()
+      mock_tmux_provider.simple_toggle:was_called(1)
+
+      -- Test focus_toggle
+      terminal_wrapper.focus_toggle()
+      mock_tmux_provider.focus_toggle:was_called(1)
+    end)
+
+    it("should handle tmux provider close", function()
+      terminal_wrapper.setup({ provider = "tmux" })
+      terminal_wrapper.open()
+      terminal_wrapper.close()
+
+      mock_tmux_provider.open:was_called(1)
+      mock_tmux_provider.close:was_called(1)
     end)
   end)
 

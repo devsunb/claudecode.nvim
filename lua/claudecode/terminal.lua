@@ -24,6 +24,8 @@ local config = {
   show_native_term_exit_tip = true,
   terminal_cmd = nil,
   auto_close = true,
+  tmux_pane_size = "30%",
+  tmux_split_direction = "h",
 }
 
 -- Lazy load providers
@@ -51,12 +53,24 @@ local function get_provider()
   local logger = require("claudecode.logger")
 
   if config.provider == "auto" then
-    -- Try snacks first, then fallback to native silently
+    -- Try tmux first if available
+    local tmux_provider = load_provider("tmux")
+    if tmux_provider and tmux_provider.is_available() then
+      return tmux_provider
+    end
+    -- Try snacks next, then fallback to native silently
     local snacks_provider = load_provider("snacks")
     if snacks_provider and snacks_provider.is_available() then
       return snacks_provider
     end
     -- Fall through to native provider
+  elseif config.provider == "tmux" then
+    local tmux_provider = load_provider("tmux")
+    if tmux_provider and tmux_provider.is_available() then
+      return tmux_provider
+    else
+      logger.warn("terminal", "'tmux' provider configured, but tmux not available. Falling back to 'native'.")
+    end
   elseif config.provider == "snacks" then
     local snacks_provider = load_provider("snacks")
     if snacks_provider and snacks_provider.is_available() then
@@ -102,6 +116,8 @@ local function build_config(opts_override)
     split_side = effective_config.split_side,
     split_width_percentage = effective_config.split_width_percentage,
     auto_close = effective_config.auto_close,
+    tmux_pane_size = effective_config.tmux_pane_size,
+    tmux_split_direction = effective_config.tmux_split_direction,
   }
 end
 
@@ -177,7 +193,7 @@ end
 -- @param user_term_config table (optional) Configuration options for the terminal.
 -- @field user_term_config.split_side string 'left' or 'right' (default: 'right').
 -- @field user_term_config.split_width_percentage number Percentage of screen width (0.0 to 1.0, default: 0.30).
--- @field user_term_config.provider string 'snacks' or 'native' (default: 'snacks').
+-- @field user_term_config.provider string 'tmux', 'snacks', 'native', or 'auto' (default: 'auto').
 -- @field user_term_config.show_native_term_exit_tip boolean Show tip for exiting native terminal (default: true).
 -- @param p_terminal_cmd string|nil The command to run in the terminal (from main config).
 function M.setup(user_term_config, p_terminal_cmd)
@@ -204,11 +220,15 @@ function M.setup(user_term_config, p_terminal_cmd)
         config[k] = v
       elseif k == "split_width_percentage" and type(v) == "number" and v > 0 and v < 1 then
         config[k] = v
-      elseif k == "provider" and (v == "snacks" or v == "native") then
+      elseif k == "provider" and (v == "auto" or v == "tmux" or v == "snacks" or v == "native") then
         config[k] = v
       elseif k == "show_native_term_exit_tip" and type(v) == "boolean" then
         config[k] = v
       elseif k == "auto_close" and type(v) == "boolean" then
+        config[k] = v
+      elseif k == "tmux_pane_size" and type(v) == "string" then
+        config[k] = v
+      elseif k == "tmux_split_direction" and (v == "h" or v == "v") then
         config[k] = v
       else
         vim.notify("claudecode.terminal.setup: Invalid value for " .. k .. ": " .. tostring(v), vim.log.levels.WARN)

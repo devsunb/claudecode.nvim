@@ -157,6 +157,8 @@ For deep technical details, see [ARCHITECTURE.md](./ARCHITECTURE.md).
       split_width_percentage = 0.30,
       provider = "auto", -- "auto", "snacks", or "native"
       auto_close = true,
+      tmux_pane_size = "30%", -- Size for tmux pane (when using tmux provider)
+      tmux_split_direction = "h", -- "h" for horizontal, "v" for vertical (when using tmux provider)
     },
 
     -- Diff Integration
